@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 
 public class RetryHttpInitializer implements HttpRequestInitializer {
 
+  /** HTTP status code occasionally returned by GCS backend error. */
+  public static final int STATUS_CODE_GONE = 410;
   /** HTTP status code indicating too many requests in a given amount of time. */
   public static final int STATUS_CODE_TOO_MANY_REQUESTS = 429;
 
@@ -130,7 +132,11 @@ public class RetryHttpInitializer implements HttpRequestInitializer {
           new HttpBackOffUnsuccessfulResponseHandler.BackOffRequired() {
             @Override
             public boolean isRequired(HttpResponse response) {
+              if (response.getStatusCode() == STATUS_CODE_GONE) {
+                LOG.warn("Got 410 Gone response from GCS, retrying {}", response.getRequest().getUrl());
+              }
               return BASE_HTTP_BACKOFF_REQUIRED.isRequired(response)
+                  || response.getStatusCode() == STATUS_CODE_GONE
                   || response.getStatusCode() == STATUS_CODE_TOO_MANY_REQUESTS;
             }
           });
